@@ -8,6 +8,8 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,6 +20,8 @@ public class RMIServer {
     public static MPIProxy MPI_PROXY;
     private static final int NTHREADS = 2;
     private static Thread shutdown;
+    static HashMap<String, ArrayList<Integer>> thisMaterRecord = null;
+    static HashMap<String,ArrayList<String>> thisNameHashLengthRecord = null;
 
     public synchronized static void start(int port) throws RemoteException {
         try {
@@ -48,9 +52,12 @@ public class RMIServer {
         });
     }
 
-    public synchronized static <T extends Remote> void register(T obj) throws RemoteException {
+    public synchronized static <T extends Remote> void register(T obj, HashMap<String, ArrayList<Integer>> materRecord,
+                                                                HashMap<String,ArrayList<String>> nameHashLengthRecord) throws RemoteException {
         String name = obj.getClass().getSimpleName();
         reg.rebind(name, UnicastRemoteObject.exportObject(obj, 0));
+        thisMaterRecord = materRecord;
+        thisNameHashLengthRecord = nameHashLengthRecord;
         System.out.println(String.format("OK %s registered", name));
     }
 

@@ -13,12 +13,6 @@ public class MpjNodes {
     static int PORT = 4552;
     static int tag = 1;
 
-    static HashMap<String, ArrayList<byte[]>> node1DataMap = new HashMap<>();
-    static HashMap<String, ArrayList<byte[]>> node2DataMap = new HashMap<>();
-    static HashMap<String, ArrayList<byte[]>> node3DataMap = new HashMap<>();
-    static HashMap<String, ArrayList<byte[]>> node4DataMap = new HashMap<>();
-    static HashMap<String, ArrayList<Integer>> materRecord = new HashMap<>();
-    static HashMap<String,ArrayList<String>> nameHashLengthRecord = new HashMap<>();
 
     public static void main(String[] args) throws Exception {
         MPI.Init(args);
@@ -26,12 +20,14 @@ public class MpjNodes {
         int size = MPI.COMM_WORLD.Size();
         System.out.println("My Rank is " + rank + ". I have started");
         if(rank==0){
+            HashMap<String, ArrayList<Integer>> materRecord = new HashMap<>();
+            HashMap<String,ArrayList<String>> nameHashLengthRecord = new HashMap<>();
             System.out.println("Master");
             System.out.println("TRY start listening");
             ServiceApi api = new ServiceApiImpl();
             try {
                 RMIServer.start(PORT);
-                RMIServer.register(api);
+                RMIServer.register(api, materRecord, nameHashLengthRecord);
             }
             catch(Exception e){
                 System.out.println("ERR " + e.getMessage());
@@ -39,6 +35,7 @@ public class MpjNodes {
             }
         }
         else if(rank==1){
+            HashMap<String, ArrayList<byte[]>> node1DataMap = new HashMap<>();
             byte[] buffer = new byte[bufferSize+extraBuffer];
             while(true) {
                 Status s = MPI.COMM_WORLD.Recv(buffer, 0, bufferSize+extraBuffer, MPI.BYTE, 0, MPI.ANY_TAG);
@@ -69,6 +66,7 @@ public class MpjNodes {
             }
         }
         else if(rank==2){
+            HashMap<String, ArrayList<byte[]>> node2DataMap = new HashMap<>();
             byte[] buffer = new byte[bufferSize+extraBuffer];
             while (true) {
                 Status s = MPI.COMM_WORLD.Recv(buffer, 0, bufferSize+extraBuffer, MPI.BYTE, 0, MPI.ANY_TAG);
@@ -98,6 +96,7 @@ public class MpjNodes {
             }
         }
         else if(rank==3){
+            HashMap<String, ArrayList<byte[]>> node3DataMap = new HashMap<>();
             byte[] buffer = new byte[bufferSize+extraBuffer];
             while (true) {
                 Status s = MPI.COMM_WORLD.Recv(buffer, 0, bufferSize+extraBuffer, MPI.BYTE, 0, MPI.ANY_TAG);
@@ -127,6 +126,7 @@ public class MpjNodes {
             }
         }
         else if(rank==4){
+            HashMap<String, ArrayList<byte[]>> node4DataMap = new HashMap<>();
             byte[] buffer = new byte[bufferSize+extraBuffer];
             while (true) {
                 Status s = MPI.COMM_WORLD.Recv(buffer, 0, bufferSize+extraBuffer, MPI.BYTE, 0, MPI.ANY_TAG);

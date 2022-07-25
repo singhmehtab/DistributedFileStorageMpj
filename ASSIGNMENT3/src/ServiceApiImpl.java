@@ -12,10 +12,10 @@ public class ServiceApiImpl implements ServiceApi{
     @Override
     public String saveFile(RemoteInputStream remoteInputStream, Long fileSize, String fileName) throws Exception {
         String hash = fileName + System.currentTimeMillis();
-        if(MpjNodes.nameHashLengthRecord.containsKey(fileName)){
+        if(RMIServer.thisNameHashLengthRecord.containsKey(fileName)){
             removeFile(fileName);
             throw new Exception("File already exist with the same name");}
-        MpjNodes.nameHashLengthRecord.put(fileName, new ArrayList<>(){{add(hash);add(String.valueOf(fileSize));}});
+        RMIServer.thisNameHashLengthRecord.put(fileName, new ArrayList<>(){{add(hash);add(String.valueOf(fileSize));}});
         long numberOfClustersRequired =  (fileSize/ MpjNodes.bufferSize);
         long numberOfClustersInOneNode = numberOfClustersRequired/MpjNodes.fileNodes;
         long numberOfNodesRequired =numberOfClustersInOneNode != 0 ? numberOfClustersRequired/numberOfClustersInOneNode : 1;
@@ -39,13 +39,13 @@ public class ServiceApiImpl implements ServiceApi{
             }
             byte[] bytes = MpjNodes.convertDataSendtoByteArray(new DataSend("Data Save", hash, array));
             RMIServer.MPIProxy.Send(bytes,0,bytes.length,MPI.BYTE,i, MpjNodes.tag);
-            MpjNodes.materRecord.putIfAbsent(hash, new ArrayList<>());
-            if(MpjNodes.materRecord.containsKey(hash)){
-                if(MpjNodes.materRecord.get(hash).size()==0){
-                    MpjNodes.materRecord.get(hash).add(i);
+            RMIServer.thisMaterRecord.putIfAbsent(hash, new ArrayList<>());
+            if(RMIServer.thisMaterRecord.containsKey(hash)){
+                if(RMIServer.thisMaterRecord.get(hash).size()==0){
+                    RMIServer.thisMaterRecord.get(hash).add(i);
                 }
-                else if(!Objects.equals(MpjNodes.materRecord.get(hash).get(MpjNodes.materRecord.get(hash).size() - 1), i)){
-                    MpjNodes.materRecord.get(hash).add(i);
+                else if(!Objects.equals(RMIServer.thisMaterRecord.get(hash).get(RMIServer.thisMaterRecord.get(hash).size() - 1), i)){
+                    RMIServer.thisMaterRecord.get(hash).add(i);
                 }
             }
         }
@@ -63,8 +63,8 @@ public class ServiceApiImpl implements ServiceApi{
             if(randomNodes.size()==0){
                 int random = ThreadLocalRandom.current().nextInt(1,5);
                 RMIServer.MPIProxy.Send(bytes,0,bytes.length,MPI.BYTE,random, MpjNodes.tag);
-                MpjNodes.materRecord.put(hash,new ArrayList<>());
-                MpjNodes.materRecord.get(hash).add(random);
+                RMIServer.thisMaterRecord.put(hash,new ArrayList<>());
+                RMIServer.thisMaterRecord.get(hash).add(random);
             }
             else {
                 RMIServer.MPIProxy.Send(bytes,0,bytes.length,MPI.BYTE,randomNodes.get(randomNodes.size()-1), MpjNodes.tag);
@@ -78,14 +78,14 @@ public class ServiceApiImpl implements ServiceApi{
     @Override
     public RemoteInputStream fetchFile(String fileName) throws Exception {
         System.out.println("Fetching file " + fileName);
-        if(!MpjNodes.nameHashLengthRecord.containsKey(fileName))throw new Exception("File Does not exist");
-        String hash = MpjNodes.nameHashLengthRecord.get(fileName).get(0);
-        byte[] buffer = new byte[Integer.parseInt(MpjNodes.nameHashLengthRecord.get(fileName).get(1))];
+        if(!RMIServer.thisNameHashLengthRecord.containsKey(fileName))throw new Exception("File Does not exist");
+        String hash = RMIServer.thisNameHashLengthRecord.get(fileName).get(0);
+        byte[] buffer = new byte[Integer.parseInt(RMIServer.thisNameHashLengthRecord.get(fileName).get(1))];
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            for(Integer i : MpjNodes.materRecord.get(hash)){
+            for(Integer i : RMIServer.thisMaterRecord.get(hash)){
                 byte[] bytes = MpjNodes.convertDataSendtoByteArray(new DataSend("Data Fetch",hash,null));
                 RMIServer.MPIProxy.Send(bytes,0,bytes.length,MPI.BYTE,i, MpjNodes.tag);
-                RMIServer.MPIProxy.Recv(buffer,0, Integer.parseInt(MpjNodes.nameHashLengthRecord.get(fileName).get(1)),MPI.BYTE,i,1);
+                RMIServer.MPIProxy.Recv(buffer,0, Integer.parseInt(RMIServer.thisNameHashLengthRecord.get(fileName).get(1)),MPI.BYTE,i,1);
                 outputStream.write(MpjNodes.trim(buffer));
             }
             InputStream inputStream = new ByteArrayInputStream(outputStream.toByteArray());
@@ -95,7 +95,7 @@ public class ServiceApiImpl implements ServiceApi{
     @Override
     public String listFiles(){
         StringBuilder builder = new StringBuilder();
-        for(Map.Entry<String, ArrayList<String>> map : MpjNodes.nameHashLengthRecord.entrySet()){
+        for(Map.Entry<String, ArrayList<String>> map : RMIServer.thisNameHashLengthRecord.entrySet()){
             builder.append(map.getKey() + "\n");
         }
         return builder.toString();
@@ -104,13 +104,13 @@ public class ServiceApiImpl implements ServiceApi{
     @Override
     public String removeFile(String fileName) throws IOException {
         System.out.println("Removing file " + fileName);
-        String hash = MpjNodes.nameHashLengthRecord.get(fileName).get(0);
-        for(Integer i : MpjNodes.materRecord.get(hash)){
+        String hash = RMIServer.thisNameHashLengthRecord.get(fileName).get(0);
+        for(Integer i : RMIServer.thisMaterRecord.get(hash)){
             byte[] bytes = MpjNodes.convertDataSendtoByteArray(new DataSend("Remove Data",hash,null));
             RMIServer.MPIProxy.Send(bytes,0,bytes.length,MPI.BYTE,i, MpjNodes.tag);
         }
-        MpjNodes.materRecord.remove(hash);
-        MpjNodes.nameHashLengthRecord.remove(fileName);
+        RMIServer.thisMaterRecord.remove(hash);
+        RMIServer.thisNameHashLengthRecord.remove(fileName);
         saveDataNodesDistribution();
         return "File Removed";
     }
@@ -123,11 +123,11 @@ public class ServiceApiImpl implements ServiceApi{
                file.createNewFile();
            }
            PrintWriter fileOutputStream = new PrintWriter(file);
-           for(Map.Entry<String,ArrayList<String>> mapEntry : MpjNodes.nameHashLengthRecord.entrySet()){
+           for(Map.Entry<String,ArrayList<String>> mapEntry : RMIServer.thisNameHashLengthRecord.entrySet()){
                fileOutputStream.write(mapEntry.getKey() + " -> ");
                String hash = mapEntry.getValue().get(0);
 
-               for(Integer i : MpjNodes.materRecord.get(hash)){
+               for(Integer i : RMIServer.thisMaterRecord.get(hash)){
                    fileOutputStream.write(i + ",");
                }
                fileOutputStream.write("\n");
